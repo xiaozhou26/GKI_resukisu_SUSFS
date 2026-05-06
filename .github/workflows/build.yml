@@ -659,7 +659,7 @@ jobs:
         if: inputs.add_zeromount && inputs.enable_susfs
         working-directory: ${{ env.KERNEL_ROOT }}/common
         run: |
-          patch -p1 -F3 --no-backup-if-mismatch < "$KERNEL_ROOT/KernelSU/patches/60_zeromount-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch"
+          patch -p1 -F3 --no-backup-if-mismatch < "$KERNEL_ROOT/patches/60_zeromount-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch"
 
 
 
