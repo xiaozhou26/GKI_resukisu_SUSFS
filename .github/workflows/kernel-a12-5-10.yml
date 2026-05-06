@@ -60,6 +60,11 @@ on:
         required: true
         type: boolean
         default: false
+      add_zeromount:
+        description: "启用 ZeroMount 零挂载隐藏"
+        required: false
+        type: boolean
+        default: false
   workflow_call:
     inputs:
       kernelsu_variant:
@@ -91,6 +96,10 @@ on:
       cancel_susfs:
         required: false
         type: boolean
+      add_zeromount:
+        required: false
+        type: boolean
+        default: false
       called_from_main:
         description: "是否从 main.yml 调用（内部使用）"
         required: false
@@ -126,6 +135,8 @@ jobs:
       use_rekernel: ${{ inputs.use_rekernel || false }}
       supp_op: false
       enable_susfs: ${{ !inputs.cancel_susfs }}
+      add_zeromount: ${{ inputs.add_zeromount || false }}
+
 
   # 仅在直接触发时运行，从 main.yml 调用时跳过
   get-ksu-manager:
