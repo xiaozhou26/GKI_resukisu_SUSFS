@@ -659,7 +659,7 @@ jobs:
         if: inputs.add_zeromount && inputs.enable_susfs
         working-directory: ${{ env.KERNEL_ROOT }}/common
         run: |
-          patch -p1 -F3 --no-backup-if-mismatch < "$GITHUB_WORKSPACE/$VERSION_DIR/ReSukiSU/patches/60_zeromount-${ANDROID_VER}-${KERNEL_VER}.patch"
+          patch -p1 -F3 --no-backup-if-mismatch < "$GITHUB_WORKSPACE/$VERSION_DIR/patches/60_zeromount-${ANDROID_VER}-${KERNEL_VER}.patch"
 
 
 
