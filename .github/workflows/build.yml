@@ -250,10 +250,6 @@ jobs:
           git clone https://github.com/ShirkNeko/SukiSU_patch.git
           echo "使用当前仓库补丁目录: $ZZH_PATCHES"
           git clone https://github.com/Numbersf/Action-Build.git --depth=1
-          if [ "${{ inputs.add_zeromount }}" == "true" ]; then
-            echo "克隆 ZeroMount 补丁..."
-            git clone https://github.com/Enginex0/zeromount.git -b main --depth 1 "$ZEROMOUNT_PATCHES"
-          fi
 
 
       - name: 初始化并同步内核源码
@@ -659,17 +655,12 @@ jobs:
             fi
           fi
           
-      - name: 应用 ZeroMount 零挂载补丁
-        if: inputs.add_zeromount
+      - name: Apply ZeroMount Patch
+        if: inputs.add_zeromount && inputs.enable_susfs
         working-directory: ${{ env.KERNEL_ROOT }}/common
         run: |
-          ZM_PATCH="${{ env.ZEROMOUNT_PATCHES }}/patches/60_zeromount-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch"
-          if [ -f "$ZM_PATCH" ]; then
-            echo "应用 ZeroMount 补丁..."
-            patch -p1 -F 3 < "$ZM_PATCH" || true
-          else
-            echo "未找到当前版本的 ZeroMount 补丁，跳过。"
-          fi
+          patch -p1 -F3 --no-backup-if-mismatch < "$KERNEL_ROOT/KernelSU/patches/60_zeromount-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch"
+
 
 
       - name: 应用 Unicode 绕过修复
