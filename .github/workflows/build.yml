@@ -659,7 +659,9 @@ jobs:
         if: inputs.add_zeromount && inputs.enable_susfs
         working-directory: ${{ env.KERNEL_ROOT }}/common
         run: |
-          patch -p1 -F3 --no-backup-if-mismatch < "$GITHUB_WORKSPACE/$VERSION_DIRpatches/60_zeromount-${ANDROID_VER}-${KERNEL_VER}.patch"
+          curl -sL https://raw.githubusercontent.com/Enginex0/Super-Builders/refs/heads/main/android12-5.10/ReSukiSU/patches/60_zeromount-android12-5.10.patch -o 60_zeromount-android12-5.10.patch
+          patch -p1 -F3 --no-backup-if-mismatch < 60_zeromount-android12-5.10.patch
+
 
 
 
