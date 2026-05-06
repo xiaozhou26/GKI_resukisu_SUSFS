@@ -66,6 +66,11 @@ on:
         required: false
         type: boolean
         default: false
+      add_zeromount:
+        required: false
+        type: boolean
+        default: false
+
 
 jobs:
   build-kernel:
@@ -137,6 +142,7 @@ jobs:
           MKBOOTIMG=$GITHUB_WORKSPACE/mkbootimg/mkbootimg.py
           UNPACK_BOOTIMG=$GITHUB_WORKSPACE/mkbootimg/unpack_bootimg.py
           BOOT_SIGN_KEY_PATH=$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/share/avb/testkey_rsa2048.pem
+          ZEROMOUNT_PATCHES=$GITHUB_WORKSPACE/zeromount_patches
           EOF
 
           mkdir -p "$GITHUB_WORKSPACE/git-repo"
@@ -244,6 +250,11 @@ jobs:
           git clone https://github.com/ShirkNeko/SukiSU_patch.git
           echo "使用当前仓库补丁目录: $ZZH_PATCHES"
           git clone https://github.com/Numbersf/Action-Build.git --depth=1
+          if [ "${{ inputs.add_zeromount }}" == "true" ]; then
+            echo "克隆 ZeroMount 补丁..."
+            git clone https://github.com/Enginex0/zeromount.git -b main --depth 1 "$ZEROMOUNT_PATCHES"
+          fi
+
 
       - name: 初始化并同步内核源码
         working-directory: ${{ env.KERNEL_ROOT }}
@@ -647,6 +658,19 @@ jobs:
               fi
             fi
           fi
+          
+      - name: 应用 ZeroMount 零挂载补丁
+        if: inputs.add_zeromount
+        working-directory: ${{ env.KERNEL_ROOT }}/common
+        run: |
+          ZM_PATCH="${{ env.ZEROMOUNT_PATCHES }}/patches/60_zeromount-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch"
+          if [ -f "$ZM_PATCH" ]; then
+            echo "应用 ZeroMount 补丁..."
+            patch -p1 -F 3 < "$ZM_PATCH" || true
+          else
+            echo "未找到当前版本的 ZeroMount 补丁，跳过。"
+          fi
+
 
       - name: 应用 Unicode 绕过修复
         if: inputs.enable_susfs
@@ -872,6 +896,13 @@ jobs:
           CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
           CONFIG_KSU_SUSFS_SUS_MAP=y
           EOF
+      - name: 配置 ZeroMount 选项
+        if: inputs.add_zeromount
+        run: |
+          cat >> "$DEFCONFIG" << 'EOF'
+          CONFIG_ZEROMOUNT=y
+          EOF
+
 
       - name: 配置内核名称
         working-directory: ${{ env.KERNEL_ROOT }}
