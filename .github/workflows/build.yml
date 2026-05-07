@@ -66,11 +66,6 @@ on:
         required: false
         type: boolean
         default: false
-      add_zeromount:
-        required: false
-        type: boolean
-        default: false
-
 
 jobs:
   build-kernel:
@@ -142,7 +137,6 @@ jobs:
           MKBOOTIMG=$GITHUB_WORKSPACE/mkbootimg/mkbootimg.py
           UNPACK_BOOTIMG=$GITHUB_WORKSPACE/mkbootimg/unpack_bootimg.py
           BOOT_SIGN_KEY_PATH=$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/share/avb/testkey_rsa2048.pem
-          ZEROMOUNT_PATCHES=$GITHUB_WORKSPACE/zeromount_patches
           EOF
 
           mkdir -p "$GITHUB_WORKSPACE/git-repo"
@@ -250,7 +244,6 @@ jobs:
           git clone https://github.com/ShirkNeko/SukiSU_patch.git
           echo "使用当前仓库补丁目录: $ZZH_PATCHES"
           git clone https://github.com/Numbersf/Action-Build.git --depth=1
-
 
       - name: 初始化并同步内核源码
         working-directory: ${{ env.KERNEL_ROOT }}
@@ -654,16 +647,6 @@ jobs:
               fi
             fi
           fi
-          
-      - name: Apply ZeroMount Patch
-        if: inputs.add_zeromount && inputs.enable_susfs
-        working-directory: ${{ env.KERNEL_ROOT }}/common
-        run: |
-          curl -sL https://raw.githubusercontent.com/Enginex0/Super-Builders/refs/heads/main/android12-5.10/ReSukiSU/patches/60_zeromount-android12-5.10.patch -o 60_zeromount-android12-5.10.patch
-          patch -p1 -F3 --no-backup-if-mismatch < 60_zeromount-android12-5.10.patch
-
-
-
 
       - name: 应用 Unicode 绕过修复
         if: inputs.enable_susfs
@@ -889,13 +872,6 @@ jobs:
           CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
           CONFIG_KSU_SUSFS_SUS_MAP=y
           EOF
-      - name: 配置 ZeroMount 选项
-        if: inputs.add_zeromount
-        run: |
-          cat >> "$DEFCONFIG" << 'EOF'
-          CONFIG_ZEROMOUNT=y
-          EOF
-
 
       - name: 配置内核名称
         working-directory: ${{ env.KERNEL_ROOT }}
