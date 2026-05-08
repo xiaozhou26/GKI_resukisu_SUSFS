@@ -1,22 +1,29 @@
-diff --git a/fs/proc/cmdline.c b/fs/proc/cmdline.c
-index e851568..5b78503 100644
-
 --- a/fs/proc/cmdline.c
 +++ b/fs/proc/cmdline.c
-@@ -4,6 +4,33 @@
+@@ -4,6 +4,7 @@
  #include <linux/kernel.h>
  #include <linux/proc_fs.h>
  #include <linux/seq_file.h>
 +#include <linux/string.h>
+ 
+ static int cmdline_proc_show(struct seq_file *m, void *v)
+ {
+@@ -14,3 +15,34 @@ static int __init proc_cmdline_init(void)
+ 	proc_create_single("cmdline", 0, NULL, cmdline_proc_show);
+ 	return 0;
+ }
+ fs_initcall(proc_cmdline_init);
 +
 +static int __init cmdline_hide_bl_lock(void)
 +{
 +	char *ptr;
 +
++	// flash.locked=0 → =1
 +	ptr = strstr(saved_command_line, "androidboot.flash.locked=0");
 +	if (ptr)
 +		ptr[sizeof("androidboot.flash.locked=") - 1] = '1';
 +
++	// vbmeta.device_state=unlocked → locked
 +	ptr = strstr(saved_command_line, "androidboot.vbmeta.device_state=unlocked");
 +	if (ptr) {
 +		size_t off = sizeof("androidboot.vbmeta.device_state=") - 1;
@@ -24,6 +31,7 @@ index e851568..5b78503 100644
 +		memcpy(ptr + off, "locked", 6);
 +	}
 +
++	// verifiedbootstate=orange → green
 +	ptr = strstr(saved_command_line, "androidboot.verifiedbootstate=orange");
 +	if (ptr) {
 +		size_t off = sizeof("androidboot.verifiedbootstate=") - 1;
@@ -34,6 +42,3 @@ index e851568..5b78503 100644
 +	return 0;
 +}
 +arch_initcall(cmdline_hide_bl_lock);
- 
- static int cmdline_proc_show(struct seq_file *m, void *v)
- {
