@@ -1,5 +1,6 @@
 diff --git a/fs/proc/cmdline.c b/fs/proc/cmdline.c
 index e851568..5b78503 100644
+
 --- a/fs/proc/cmdline.c
 +++ b/fs/proc/cmdline.c
 @@ -4,6 +4,33 @@
