@@ -65,6 +65,11 @@ on:
         required: false
         type: boolean
         default: false
+      use_hide_bl:
+        description: "启用伪回锁 (隐藏BL锁)"
+        required: false
+        type: boolean
+        default: false
   workflow_call:
     inputs:
       kernelsu_variant:
@@ -97,6 +102,10 @@ on:
         required: false
         type: boolean
       add_zeromount:
+        required: false
+        type: boolean
+        default: false
+      use_hide_bl:
         required: false
         type: boolean
         default: false
@@ -136,6 +145,7 @@ jobs:
       supp_op: false
       enable_susfs: ${{ !inputs.cancel_susfs }}
       add_zeromount: ${{ inputs.add_zeromount || false }}
+      use_hide_bl: ${{ inputs.use_hide_bl || false }}
 
 
   # 仅在直接触发时运行，从 main.yml 调用时跳过

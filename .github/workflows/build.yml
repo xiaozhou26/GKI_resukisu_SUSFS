@@ -66,6 +66,10 @@ on:
         required: false
         type: boolean
         default: false
+      use_hide_bl:
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   build-kernel:
@@ -96,6 +100,7 @@ jobs:
           echo "BBG 补丁      : ${{ inputs.use_bbg }}"
           echo "KPM 功能      : ${{ inputs.use_kpm }}"
           echo "Re-Kernel     : ${{ inputs.use_rekernel }}"
+          echo "伪回锁(隐藏BL): ${{ inputs.use_hide_bl }}"
           echo "Stock Config  : 自动检测 config/stock_defconfig"
           echo "========================================"
 
@@ -656,6 +661,19 @@ jobs:
             patch -p1 --forward < "$ACTION_BUILD/patches/unicode_bypass_fix_6.1-.patch" || true
           else
             patch -p1 --forward < "$ACTION_BUILD/patches/unicode_bypass_fix_6.1+.patch" || true
+          fi
+
+      - name: 应用伪回锁补丁 (隐藏BL锁)
+        if: inputs.use_hide_bl
+        working-directory: ${{ env.KERNEL_ROOT }}/common
+        run: |
+          echo "应用伪回锁补丁..."
+          if [ -f fs/proc/cmdline.c ]; then
+            if ! patch -p1 --forward < "$ZZH_PATCHES/patches/hide_bl_lock.patch"; then
+              echo "::warning::伪回锁补丁应用失败，可能已应用或上下文不匹配"
+            fi
+          else
+            echo "::warning::fs/proc/cmdline.c 不存在，跳过伪回锁补丁"
           fi
 
       - name: 配置 ZRAM LZ4 补丁栈

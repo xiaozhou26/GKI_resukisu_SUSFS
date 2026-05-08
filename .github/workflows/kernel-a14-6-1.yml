@@ -60,6 +60,11 @@ on:
         required: true
         type: boolean
         default: false
+      use_hide_bl:
+        description: "启用伪回锁 (隐藏BL锁)"
+        required: false
+        type: boolean
+        default: false
   workflow_call:
     inputs:
       kernelsu_variant:
@@ -91,6 +96,10 @@ on:
       cancel_susfs:
         required: false
         type: boolean
+      use_hide_bl:
+        required: false
+        type: boolean
+        default: false
       called_from_main:
         description: "是否从 main.yml 调用（内部使用）"
         required: false
@@ -165,6 +174,7 @@ jobs:
       use_rekernel: ${{ inputs.use_rekernel || false }}
       supp_op: false
       enable_susfs: ${{ !inputs.cancel_susfs }}
+      use_hide_bl: ${{ inputs.use_hide_bl || false }}
 
   # 仅在直接触发时运行，从 main.yml 调用时跳过
   get-ksu-manager:
