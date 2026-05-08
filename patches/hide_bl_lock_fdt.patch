@@ -1,0 +1,69 @@
+--- a/init/main.c
++++ b/init/main.c
+@@ -110,6 +110,10 @@
+ 
+ #include <kunit/test.h>
+ 
++#ifdef CONFIG_OF
++#include <linux/of_fdt.h>
++#include <linux/libfdt.h>
++#endif
+ 
+ static int kernel_init(void *);
+ 
+@@ -625,6 +629,44 @@ static void __init print_unknown_bootoptions(void)
+ 	memstart_addr = (unsigned long)__va(phys_base_addr);
+ #endif
+ 
++static void __init hide_bl_lock_fdt(void)
++{
++#ifdef CONFIG_OF
++	void *fdt = initial_boot_params;
++	int node, len;
++	const char *state;
++
++	if (!fdt)
++		return;
++
++	node = fdt_path_offset(fdt, "/firmware/android");
++	if (node < 0)
++		return;
++
++	/* vbmeta_device_state: unlocked -> locked */
++	state = fdt_getprop(fdt, node, "vbmeta_device_state", &len);
++	if (state && len >= 7 && !strcmp(state, "unlocked")) {
++		((char *)state)[0] = 'l'; ((char *)state)[1] = 'o';
++		((char *)state)[2] = 'c'; ((char *)state)[3] = 'k';
++		((char *)state)[4] = 'e'; ((char *)state)[5] = 'd';
++		((char *)state)[6] = '\0'; ((char *)state)[7] = '\0';
++	}
++
++	/* verifiedbootstate: orange -> green */
++	state = fdt_getprop(fdt, node, "verifiedbootstate", &len);
++	if (state && len >= 6 && !strcmp(state, "orange")) {
++		((char *)state)[0] = 'g'; ((char *)state)[1] = 'r';
++		((char *)state)[2] = 'e'; ((char *)state)[3] = 'e';
++		((char *)state)[4] = 'n'; ((char *)state)[5] = '\0';
++	}
++
++	/* flash_locked: 0 -> 1 */
++	state = fdt_getprop(fdt, node, "flash_locked", &len);
++	if (state && len >= 1 && !strcmp(state, "0")) {
++		((char *)state)[0] = '1';
++	}
++#endif
++}
++
+ asmlinkage __visible void __init __no_sanitize_address start_kernel(void)
+ {
+ 	char *command_line;
+@@ -693,6 +735,8 @@ asmlinkage __visible void __init __no_sanitize_address start_kernel(void)
+ 	boot_cpu_init();
+ 	page_address_init();
+ 	pr_notice("%s", linux_banner);
++
++	hide_bl_lock_fdt();
++
+ 	early_security_init();
+ 	setup_arch(&command_line);
+ 	setup_command_line(command_line);
