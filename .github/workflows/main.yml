@@ -82,6 +82,10 @@ on:
         description: "禁用 SUSFS"
         type: boolean
         default: false
+      use_hide_bl:
+        description: "启用伪回锁 (隐藏BL锁)"
+        type: boolean
+        default: false
 
       # ==================== 构建版本选择 ====================
       build_a12_5_10:
@@ -133,6 +137,7 @@ jobs:
       use_kpm: ${{ inputs.use_kpm }}
       use_rekernel: ${{ inputs.use_rekernel }}
       cancel_susfs: ${{ inputs.cancel_susfs }}
+      use_hide_bl: ${{ inputs.use_hide_bl }}
       called_from_main: true
 
   # ==================== Android 13 - 5.15 构建 ====================
@@ -150,6 +155,7 @@ jobs:
       use_kpm: ${{ inputs.use_kpm }}
       use_rekernel: ${{ inputs.use_rekernel }}
       cancel_susfs: ${{ inputs.cancel_susfs }}
+      use_hide_bl: ${{ inputs.use_hide_bl }}
       called_from_main: true
 
   # ==================== Android 14 - 6.1 构建 ====================
@@ -167,6 +173,7 @@ jobs:
       use_kpm: ${{ inputs.use_kpm }}
       use_rekernel: ${{ inputs.use_rekernel }}
       cancel_susfs: ${{ inputs.cancel_susfs }}
+      use_hide_bl: ${{ inputs.use_hide_bl }}
       called_from_main: true
 
   # ==================== Android 15 - 6.6 构建 ====================
@@ -184,6 +191,7 @@ jobs:
       use_kpm: ${{ inputs.use_kpm }}
       use_rekernel: ${{ inputs.use_rekernel }}
       cancel_susfs: ${{ inputs.cancel_susfs }}
+      use_hide_bl: ${{ inputs.use_hide_bl }}
       called_from_main: true
 
   # ==================== Android 16 - 6.12 构建 ====================
@@ -201,6 +209,7 @@ jobs:
       use_kpm: ${{ inputs.use_kpm }}
       use_rekernel: ${{ inputs.use_rekernel }}
       cancel_susfs: ${{ inputs.cancel_susfs }}
+      use_hide_bl: ${{ inputs.use_hide_bl }}
       called_from_main: true
 
   # ==================== 收集补丁冲突文件 ====================
