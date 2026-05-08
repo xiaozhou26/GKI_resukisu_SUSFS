@@ -1,17 +1,19 @@
-diff --git a/fs/proc/cmdline.c b/fs/proc/cmdline.c
-index e851568..5b78503 100644
 --- a/fs/proc/cmdline.c
 +++ b/fs/proc/cmdline.c
-@@ -4,6 +4,33 @@
+@@ -4,6 +4,56 @@
  #include <linux/kernel.h>
  #include <linux/proc_fs.h>
  #include <linux/seq_file.h>
 +#include <linux/string.h>
++#include <linux/of_fdt.h>
++#include <linux/libfdt.h>
 +
 +static int __init cmdline_hide_bl_lock(void)
 +{
 +	char *ptr;
++	void *fdt = initial_boot_params;
 +
++	// 1. 修改 cmdline (saved_command_line)
 +	ptr = strstr(saved_command_line, "androidboot.flash.locked=0");
 +	if (ptr)
 +		ptr[sizeof("androidboot.flash.locked=") - 1] = '1';
@@ -30,9 +32,30 @@ index e851568..5b78503 100644
 +		memcpy(ptr + off, "green", 5);
 +	}
 +
++	// 2. 修改 FDT/DTB (针对高通等优先读取设备树的平台)
++	if (fdt) {
++		int node = fdt_path_offset(fdt, "/firmware/android");
++		if (node >= 0) {
++			const char *state;
++			int len;
++
++			state = fdt_getprop(fdt, node, "vbmeta_device_state", &len);
++			if (state && len >= 7 && !strcmp(state, "unlocked"))
++				memcpy((void *)state, "locked\0\0", 8);
++
++			state = fdt_getprop(fdt, node, "verifiedbootstate", &len);
++			if (state && len >= 6 && !strcmp(state, "orange"))
++				memcpy((void *)state, "green\0", 6);
++
++			state = fdt_getprop(fdt, node, "flash_locked", &len);
++			if (state && len >= 1 && !strcmp(state, "0"))
++				memcpy((void *)state, "1\0", 2);
++		}
++	}
++
 +	return 0;
 +}
-+arch_initcall(cmdline_hide_bl_lock);
++pure_initcall(cmdline_hide_bl_lock);
  
  static int cmdline_proc_show(struct seq_file *m, void *v)
  {
