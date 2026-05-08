@@ -663,18 +663,32 @@ jobs:
             patch -p1 --forward < "$ACTION_BUILD/patches/unicode_bypass_fix_6.1+.patch" || true
           fi
 
-      - name: 应用伪回锁补丁 (隐藏BL锁)
+      - name: 应用伪回锁补丁 - Cmdline (隐藏BL锁)
         if: inputs.use_hide_bl
         working-directory: ${{ env.KERNEL_ROOT }}/common
         run: |
-          echo "应用伪回锁补丁..."
+          echo "应用伪回锁 cmdline 补丁..."
           if [ -f fs/proc/cmdline.c ]; then
             if ! patch -p1 --forward < "$ZZH_PATCHES/patches/hide_bl_lock.patch"; then
-              echo "::warning::伪回锁补丁应用失败，可能已应用或上下文不匹配"
+              echo "::warning::Cmdline补丁应用失败"
             fi
           else
-            echo "::warning::fs/proc/cmdline.c 不存在，跳过伪回锁补丁"
+            echo "::warning::fs/proc/cmdline.c 不存在，跳过"
           fi
+
+      - name: 应用伪回锁补丁 - FDT/DTB (高通机型必需)
+        if: inputs.use_hide_bl
+        working-directory: ${{ env.KERNEL_ROOT }}/common
+        run: |
+          echo "应用伪回锁 FDT 补丁 (针对高通平台)..."
+          if [ -f init/main.c ]; then
+            if ! patch -p1 --forward < "$ZZH_PATCHES/patches/hide_bl_lock_fdt.patch"; then
+              echo "::warning::FDT补丁应用失败，可能上下文不匹配"
+            fi
+          else
+            echo "::warning::init/main.c 不存在，跳过"
+          fi
+
 
       - name: 配置 ZRAM LZ4 补丁栈
         if: inputs.use_zram
