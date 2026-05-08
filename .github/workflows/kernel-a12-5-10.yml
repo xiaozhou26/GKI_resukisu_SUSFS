@@ -60,11 +60,6 @@ on:
         required: true
         type: boolean
         default: false
-      add_zeromount:
-        description: "启用 ZeroMount 零挂载隐藏"
-        required: false
-        type: boolean
-        default: false
       use_hide_bl:
         description: "启用伪回锁 (隐藏BL锁)"
         required: false
