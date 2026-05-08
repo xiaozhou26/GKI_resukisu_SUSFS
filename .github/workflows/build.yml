@@ -667,73 +667,14 @@ jobs:
         if: inputs.use_hide_bl
         working-directory: ${{ env.KERNEL_ROOT }}/common
         run: |
-          echo "应用伪回锁补丁，修改 fs/proc/cmdline.c ..."
-          python3 << 'PYEOF'
-          import re, os
-
-          filepath = "fs/proc/cmdline.c"
-          if not os.path.exists(filepath):
-              print(f"警告: {filepath} 不存在，跳过伪回锁补丁")
-              exit(0)
-
-          with open(filepath, 'r') as f:
-              content = f.read()
-
-          for inc in ['#include <linux/slab.h>', '#include <linux/string.h>']:
-              if inc not in content:
-                  content = content.replace('#include <linux/seq_file.h>',
-                                           '#include <linux/seq_file.h>\n' + inc)
-
-          old_pattern = r'static\s+int\s+cmdline_proc_show\s*\(\s*struct\s+seq_file\s*\*\s*m\s*,\s*void\s*\*\s*v\s*\)\s*\{.*?\n\}'
-
-          new_func = r'''static int cmdline_proc_show(struct seq_file *m, void *v)
-          {
-          	char *cmdline = kstrdup(saved_command_line, GFP_KERNEL);
-          	char *ptr;
-
-          	if (cmdline) {
-          		ptr = strstr(cmdline, "androidboot.flash.locked=0");
-          		if (ptr)
-          			ptr[sizeof("androidboot.flash.locked=") - 1] = '1';
-
-          		ptr = strstr(cmdline, "androidboot.vbmeta.device_state=unlocked");
-          		if (ptr) {
-          			size_t off = sizeof("androidboot.vbmeta.device_state=") - 1;
-          			memmove(ptr + off + 6, ptr + off + 8, strlen(ptr + off + 8) + 1);
-          			memcpy(ptr + off, "locked", 6);
-          		}
-
-          		ptr = strstr(cmdline, "androidboot.verifiedbootstate=orange");
-          		if (ptr) {
-          			size_t off = sizeof("androidboot.verifiedbootstate=") - 1;
-          			memmove(ptr + off + 5, ptr + off + 6, strlen(ptr + off + 6) + 1);
-          			memcpy(ptr + off, "green", 5);
-          		}
-
-          		seq_puts(m, cmdline);
-          		kfree(cmdline);
-          	} else {
-          		seq_puts(m, saved_command_line);
-          	}
-          	seq_putc(m, '\n');
-          	return 0;
-          }'''
-
-          if re.search(old_pattern, content, re.DOTALL):
-              content = re.sub(old_pattern, new_func, content, count=1, flags=re.DOTALL)
-              print("伪回锁: 已替换 cmdline_proc_show 函数")
-          else:
-              print("警告: 未匹配 cmdline_proc_show 函数，尝试简单替换")
-              content = content.replace(
-                  'seq_puts(m, saved_command_line);',
-                  '{ char *_cl = kstrdup(saved_command_line, GFP_KERNEL); char *_p; if (_cl) { _p = strstr(_cl, "androidboot.flash.locked=0"); if (_p) _p[25] = \'1\'; _p = strstr(_cl, "androidboot.vbmeta.device_state=unlocked"); if (_p) { memmove(_p+37+6, _p+37+8, strlen(_p+37+8)+1); memcpy(_p+37, "locked", 6); } _p = strstr(_cl, "androidboot.verifiedbootstate=orange"); if (_p) { memmove(_p+33+5, _p+33+6, strlen(_p+33+6)+1); memcpy(_p+33, "green", 5); } seq_puts(m, _cl); kfree(_cl); } else { seq_puts(m, saved_command_line); } }'
-              )
-
-          with open(filepath, 'w') as f:
-              f.write(content)
-
-          print("伪回锁补丁已应用")
-          PYEOF
+          echo "应用伪回锁补丁..."
+          if [ -f fs/proc/cmdline.c ]; then
+            if ! patch -p1 --forward < "$ZZH_PATCHES/patches/hide_bl_lock.patch"; then
+              echo "::warning::伪回锁补丁应用失败，可能已应用或上下文不匹配"
+            fi
+          else
+            echo "::warning::fs/proc/cmdline.c 不存在，跳过伪回锁补丁"
+          fi
 
       - name: 配置 ZRAM LZ4 补丁栈
         if: inputs.use_zram
