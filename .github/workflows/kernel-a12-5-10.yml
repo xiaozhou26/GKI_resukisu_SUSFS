@@ -96,10 +96,6 @@ on:
       cancel_susfs:
         required: false
         type: boolean
-      add_zeromount:
-        required: false
-        type: boolean
-        default: false
       use_hide_bl:
         required: false
         type: boolean
@@ -139,7 +135,6 @@ jobs:
       use_rekernel: ${{ inputs.use_rekernel || false }}
       supp_op: false
       enable_susfs: ${{ !inputs.cancel_susfs }}
-      add_zeromount: ${{ inputs.add_zeromount || false }}
       use_hide_bl: ${{ inputs.use_hide_bl || false }}
 
 
