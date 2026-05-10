@@ -663,18 +663,51 @@ jobs:
             patch -p1 --forward < "$ACTION_BUILD/patches/unicode_bypass_fix_6.1+.patch" || true
           fi
 
-      - name: 应用伪回锁补丁 (Cmdline+FDT双杀)
-        if: inputs.use_hide_bl
+      - name: 应用伪回锁补丁 (修改 Cmdline)
         working-directory: ${{ env.KERNEL_ROOT }}/common
         run: |
-          echo "应用伪回锁补丁 (同时修改Cmdline和DTB)..."
-          if [ -f fs/proc/cmdline.c ]; then
-            if ! patch -p1 --forward < "$ZZH_PATCHES/patches/hide_bl_lock.patch"; then
-              echo "::warning::伪回锁补丁应用失败"
-            fi
-          else
-            echo "::warning::fs/proc/cmdline.c 不存在，跳过"
+          echo "正在注入伪回锁代码到 fs/proc/cmdline.c ..."
+          FILE="fs/proc/cmdline.c"
+          
+          if [ ! -f "$FILE" ]; then
+            echo "::error::未找到 $FILE"
+            exit 1
           fi
+
+          # 使用 awk 精准替换，避免 patch 格式报错
+          awk '
+          /^#include <linux\/seq_file.h>/ {
+              print $0
+              print "#include <linux/string.h>"
+              print "#include <linux/slab.h>"
+              next
+          }
+          /seq_puts\(m, saved_command_line\);/ {
+              print "\tchar *cmdline = kstrdup(saved_command_line, GFP_KERNEL);"
+              print "\tif (cmdline) {"
+              print "\t\tchar *ptr;"
+              print ""
+              print "\t\tptr = strstr(cmdline, \"androidboot.verifiedbootstate=orange\");"
+              print "\t\tif (ptr) memcpy(ptr + strlen(\"androidboot.verifiedbootstate=\"), \"green\", 5);"
+              print ""
+              print "\t\tptr = strstr(cmdline, \"androidboot.flash.locked=0\");"
+              print "\t\tif (ptr) *(ptr + strlen(\"androidboot.flash.locked=\")) = '\''1'\'';"
+              print ""
+              print "\t\tptr = strstr(cmdline, \"androidboot.lockstate=unlocked\");"
+              print "\t\tif (ptr) memcpy(ptr + strlen(\"androidboot.lockstate=\"), \"locked\", 6);"
+              print ""
+              print "\t\tseq_puts(m, cmdline);"
+              print "\t\tkfree(cmdline);"
+              print "\t} else {"
+              print "\t\tseq_puts(m, saved_command_line);"
+              print "\t}"
+              next
+          }
+          { print }
+          ' "$FILE" > "${FILE}.tmp" && mv "${FILE}.tmp" "$FILE"
+
+          echo "伪回锁代码注入完成！"
+
 
 
 
