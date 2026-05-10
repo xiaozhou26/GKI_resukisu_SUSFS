@@ -66,10 +66,6 @@ on:
         required: false
         type: boolean
         default: false
-      use_hide_bl:
-        required: false
-        type: boolean
-        default: false
 
 jobs:
   build-kernel:
@@ -100,7 +96,6 @@ jobs:
           echo "BBG 补丁      : ${{ inputs.use_bbg }}"
           echo "KPM 功能      : ${{ inputs.use_kpm }}"
           echo "Re-Kernel     : ${{ inputs.use_rekernel }}"
-          echo "伪回锁(隐藏BL): ${{ inputs.use_hide_bl }}"
           echo "Stock Config  : 自动检测 config/stock_defconfig"
           echo "========================================"
 
@@ -662,52 +657,6 @@ jobs:
           else
             patch -p1 --forward < "$ACTION_BUILD/patches/unicode_bypass_fix_6.1+.patch" || true
           fi
-
-      - name: 应用伪回锁补丁 (修改底层 Cmdline)
-        working-directory: ${{ env.KERNEL_ROOT }}/common
-        run: |
-          echo "正在注入伪回锁代码到 init/main.c ..."
-          FILE="init/main.c"
-          
-          if [ ! -f "$FILE" ]; then
-            echo "::error::未找到 $FILE"
-            exit 1
-          fi
-
-          # 1. 添加必要的头文件
-          sed -i '/#include <linux\/kernel.h>/a #include <linux\/string.h>' "$FILE"
-
-          # 2. 定义伪锁替换函数 (覆盖小米全系检测点)
-          SPOOF_FUNC='\
-          \n/* [SPOOF_LOCK] Fake Lock State for Xiaomi\/Redmi */\
-          \nstatic void __init spoof_lock_state(void) {\
-          \n    char *p;\
-          \n    p = strstr(boot_command_line, "androidboot.verifiedbootstate=orange");\
-          \n    if (p) memcpy(p + strlen("androidboot.verifiedbootstate="), "green", 5);\
-          \n    p = strstr(boot_command_line, "androidboot.flash.locked=0");\
-          \n    if (p) *(p + strlen("androidboot.flash.locked=")) = '\''1'\'';\
-          \n    p = strstr(boot_command_line, "androidboot.lockstate=unlocked");\
-          \n    if (p) memcpy(p + strlen("androidboot.lockstate="), "locked", 6);\
-          \n    p = strstr(boot_command_line, "androidboot.vbmeta.device_state=unlocked");\
-          \n    if (p) memcpy(p + strlen("androidboot.vbmeta.device_state="), "locked", 6);\
-          \n}\
-          \n'
-
-          # 兼容不同内核版本的 start_kernel 函数签名，在函数前插入伪锁函数
-          sed -i "/^asmlinkage __visible void __init start_kernel/i\\$SPOOF_FUNC" "$FILE"
-          sed -i "/^void __init __no_sanitize_address start_kernel/i\\$SPOOF_FUNC" "$FILE"
-          sed -i "/^void __init start_kernel/i\\$SPOOF_FUNC" "$FILE"
-
-          # 3. 在内核解析早期参数后，立即调用伪锁函数
-          # 这是时序最关键的：必须在 parse_early_param 之后，系统读取属性之前修改
-          sed -i '/parse_early_param();/a \tspoof_lock_state();' "$FILE"
-
-          echo "伪回锁代码注入完成！"
-          echo "验证注入结果："
-          grep -A 2 "spoof_lock_state" "$FILE"
-
-
-
 
       - name: 配置 ZRAM LZ4 补丁栈
         if: inputs.use_zram
