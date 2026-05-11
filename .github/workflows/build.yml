@@ -66,6 +66,10 @@ on:
         required: false
         type: boolean
         default: false
+      hide_system_log:
+        required: false
+        type: boolean
+        default: true
 
 jobs:
   build-kernel:
@@ -96,6 +100,7 @@ jobs:
           echo "BBG 补丁      : ${{ inputs.use_bbg }}"
           echo "KPM 功能      : ${{ inputs.use_kpm }}"
           echo "Re-Kernel     : ${{ inputs.use_rekernel }}"
+          echo "系统日志伪装  : ${{ inputs.hide_system_log }}"
           echo "Stock Config  : 自动检测 config/stock_defconfig"
           echo "========================================"
 
@@ -841,6 +846,13 @@ jobs:
           # 配置 defconfig（幂等）
           grep -q '^CONFIG_REKERNEL=y$' "$DEFCONFIG" || echo "CONFIG_REKERNEL=y" >> "$DEFCONFIG"
           grep -q '^CONFIG_REKERNEL_NETWORK=y$' "$DEFCONFIG" || echo "CONFIG_REKERNEL_NETWORK=y" >> "$DEFCONFIG"
+
+      - name: 应用系统日志伪装补丁
+        if: inputs.hide_system_log
+        working-directory: ${{ env.KERNEL_ROOT }}/common
+        run: |
+          echo "应用系统日志伪装补丁..."
+          patch -p1 --forward < "$ZZH_PATCHES/patches/hide_system_log.patch" || true
 
       - name: 配置内核选项
         working-directory: ${{ env.KERNEL_ROOT }}

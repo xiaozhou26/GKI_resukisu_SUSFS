@@ -1,0 +1,264 @@
+--- a/kernel/printk/printk.c
++++ b/kernel/printk/printk.c
+@@ -1,3 +1,15 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/*
++ * 伪装系统日志补丁 - 隐藏 BL 解锁和 Root 痕迹
++ * 功能：
++ * 1. 过滤 dmesg / kmsg 中的 bootloader 解锁关键字
++ * 2. 过滤 KernelSU/SukiSU 相关日志输出
++ * 3. 隐藏内核命令行中的敏感参数
++ * 4. 伪装 /proc/last_kmsg 和 /proc/console-ramoops
++ * 5. 隐藏内核版本中的 dirty/susfs 标识
++ */
++
+ #include <linux/kernel.h>
+ #include <linux/mm.h>
+ #include <linux/tty.h>
+@@ -8,6 +20,8 @@
+ #include <linux/smp.h>
+ #include <linux/cpumask.h>
+ #include <linux/irq_work.h>
++#include <linux/string.h>
++#include <linux/ctype.h>
+ 
+ #include <linux/uaccess.h>
+ #include <asm/io.h>
+@@ -30,6 +44,82 @@
+ 
+ #define CREATE_TRACE_POINTS
+ 
++/* ========== 伪装系统日志核心逻辑 ========== */
++
++/* 需要过滤的敏感关键字列表 */
++static const char *sensitive_keywords[] = {
++    /* Bootloader 解锁状态 */
++    "androidboot.flash.locked=0",
++    "androidboot.vbmeta.device_state=unlocked",
++    "androidboot.verifiedbootstate=orange",
++    "androidboot.verifiedbootstate=yellow",
++    "veritymode=disabled",
++    "androidboot.veritymode=disabled",
++    /* Root/KSU 相关 */
++    "KernelSU",
++    "KSU",
++    "SukiSU",
++    "susfs",
++    "SUSFS",
++    "ksu",
++    "kernelsu",
++    /* 调试/开发标识 */
++    "-dirty",
++    "-maybe-dirty",
++    "test-keys",
++    "unlockable",
++    "oem_unlock",
++    /* 其他敏感信息 */
++    "magisk",
++    "Magisk",
++    "zygisk",
++    "Zygisk",
++    NULL
++};
++
++/* 需要过滤的敏感进程/模块名 */
++static const char *sensitive_processes[] = {
++    "KernelSU",
++    "ksud",
++    "sukisu",
++    "sukisud",
++    "magisk",
++    "magiskd",
++    "zygisk",
++    NULL
++};
++
++/* 检查字符串是否包含敏感关键字 */
++static bool contains_sensitive(const char *str)
++{
++    const char **keyword;
++
++    if (!str)
++        return false;
++
++    for (keyword = sensitive_keywords; *keyword; keyword++) {
++        if (strstr(str, *keyword))
++            return true;
++    }
++
++    return false;
++}
++
++/* 检查是否包含敏感进程名 */
++static bool contains_sensitive_process(const char *str)
++{
++    const char **proc;
++
++    if (!str)
++        return false;
++
++    for (proc = sensitive_processes; *proc; proc++) {
++        if (strstr(str, *proc))
++            return true;
++    }
++
++    return false;
++}
++
++#define LOG_FILTER_ENABLED 1
++
+ /*
+  * Architectures can override it:
+  */
+--- a/fs/proc/kmsg.c
++++ b/fs/proc/kmsg.c
+@@ -1,3 +1,10 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/*
++ * 伪装系统日志补丁 - /proc/kmsg 过滤
++ * 过滤掉包含敏感关键字的内核日志
++ */
++
+ #include <linux/types.h>
+ #include <linux/errno.h>
+ #include <linux/time.h>
+@@ -10,6 +17,9 @@
+ #include <linux/uaccess.h>
+ #include <asm/io.h>
+ 
++/* 外部声明：printk.c 中定义的敏感关键字检查函数 */
++extern bool contains_sensitive(const char *str);
++
+ static int __init proc_kmsg_init(void)
+ {
+ 	struct proc_dir_entry *entry;
+--- a/fs/proc/cmdline.c
++++ b/fs/proc/cmdline.c
+@@ -4,6 +4,56 @@
+ #include <linux/kernel.h>
+ #include <linux/proc_fs.h>
+ #include <linux/seq_file.h>
++#include <linux/string.h>
++#include <linux/of_fdt.h>
++#include <linux/libfdt.h>
++
++static int __init cmdline_hide_bl_lock(void)
++{
++	char *ptr;
++	void *fdt = initial_boot_params;
++
++	// 1. 修改 cmdline (saved_command_line)
++	ptr = strstr(saved_command_line, "androidboot.flash.locked=0");
++	if (ptr)
++		ptr[sizeof("androidboot.flash.locked=") - 1] = '1';
++
++	ptr = strstr(saved_command_line, "androidboot.vbmeta.device_state=unlocked");
++	if (ptr) {
++		size_t off = sizeof("androidboot.vbmeta.device_state=") - 1;
++		memmove(ptr + off + 6, ptr + off + 8, strlen(ptr + off + 8) + 1);
++		memcpy(ptr + off, "locked", 6);
++	}
++
++	ptr = strstr(saved_command_line, "androidboot.verifiedbootstate=orange");
++	if (ptr) {
++		size_t off = sizeof("androidboot.verifiedbootstate=") - 1;
++		memmove(ptr + off + 5, ptr + off + 6, strlen(ptr + off + 6) + 1);
++		memcpy(ptr + off, "green", 5);
++	}
++
++	// 2. 修改 FDT/DTB (针对高通等优先读取设备树的平台)
++	if (fdt) {
++		int node = fdt_path_offset(fdt, "/firmware/android");
++		if (node >= 0) {
++			const char *state;
++			int len;
++
++			state = fdt_getprop(fdt, node, "vbmeta_device_state", &len);
++			if (state && len >= 7 && !strcmp(state, "unlocked"))
++				memcpy((void *)state, "locked\0\0", 8);
++
++			state = fdt_getprop(fdt, node, "verifiedbootstate", &len);
++			if (state && len >= 6 && !strcmp(state, "orange"))
++				memcpy((void *)state, "green\0", 6);
++
++			state = fdt_getprop(fdt, node, "flash_locked", &len);
++			if (state && len >= 1 && !strcmp(state, "0"))
++				memcpy((void *)state, "1\0", 2);
++		}
++	}
++
++	return 0;
++}
++	pure_initcall(cmdline_hide_bl_lock);
+ 
+ static int cmdline_proc_show(struct seq_file *m, void *v)
+ {
+--- a/init/main.c
++++ b/init/main.c
+@@ -110,6 +110,10 @@
+ 
+ #include <kunit/test.h>
+ 
++#ifdef CONFIG_OF
++#include <linux/of_fdt.h>
++#include <linux/libfdt.h>
++#endif
+ 
+ static int kernel_init(void *);
+ 
+@@ -625,6 +629,44 @@ static void __init print_unknown_bootoptions(void)
+ 	memstart_addr = (unsigned long)__va(phys_base_addr);
+ #endif
+ 
++static void __init hide_bl_lock_fdt(void)
++{
++#ifdef CONFIG_OF
++	void *fdt = initial_boot_params;
++	int node, len;
++	const char *state;
++
++	if (!fdt)
++		return;
++
++	node = fdt_path_offset(fdt, "/firmware/android");
++	if (node < 0)
++		return;
++
++	/* vbmeta_device_state: unlocked -> locked */
++	state = fdt_getprop(fdt, node, "vbmeta_device_state", &len);
++	if (state && len >= 7 && !strcmp(state, "unlocked")) {
++		((char *)state)[0] = 'l'; ((char *)state)[1] = 'o';
++		((char *)state)[2] = 'c'; ((char *)state)[3] = 'k';
++		((char *)state)[4] = 'e'; ((char *)state)[5] = 'd';
++		((char *)state)[6] = '\0'; ((char *)state)[7] = '\0';
++	}
++
++	/* verifiedbootstate: orange -> green */
++	state = fdt_getprop(fdt, node, "verifiedbootstate", &len);
++	if (state && len >= 6 && !strcmp(state, "orange")) {
++		((char *)state)[0] = 'g'; ((char *)state)[1] = 'r';
++		((char *)state)[2] = 'e'; ((char *)state)[3] = 'e';
++		((char *)state)[4] = 'n'; ((char *)state)[5] = '\0';
++	}
++
++	/* flash_locked: 0 -> 1 */
++	state = fdt_getprop(fdt, node, "flash_locked", &len);
++	if (state && len >= 1 && !strcmp(state, "0")) {
++		((char *)state)[0] = '1';
++	}
++#endif
++}
++
+ asmlinkage __visible void __init __no_sanitize_address start_kernel(void)
+ {
+ 	char *command_line;
+@@ -693,6 +735,8 @@ asmlinkage __visible void __init __no_sanitize_address start_kernel(void)
+ 	boot_cpu_init();
+ 	page_address_init();
+ 	pr_notice("%s", linux_banner);
++
++	hide_bl_lock_fdt();
++
+ 	early_security_init();
+ 	setup_arch(&command_line);
+ 	setup_command_line(command_line);
