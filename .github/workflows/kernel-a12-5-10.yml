@@ -27,7 +27,7 @@ on:
         description: "自定义构建时间 (可选，N或留空=当前UTC)"
         required: false
         type: string
-        default: "Wed Apr15 08:46:20 UTC 2026"
+        default: "Tue Oct 21 03:03:12 UTC 2025"
       use_kpm:
         description: "KPM 功能（patched 尚不支持）"
         required: true
