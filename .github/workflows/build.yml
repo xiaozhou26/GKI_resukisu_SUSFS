@@ -385,7 +385,7 @@ jobs:
 
           case "$variant_input" in
             "Official"|"ReSukiSU")
-              BRANCH="-s sync-upstream"
+              BRANCH="-s dev"
               ;;
             "SukiSU")
               if [ "${{ inputs.enable_susfs }}" = "false" ]; then
